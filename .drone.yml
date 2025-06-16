@@ -1,0 +1,65 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+    - name: start
+      image: fifsky/drone-wechat-work
+      pull: always
+      settings:
+        url:
+          from_secret: wecom_bot_url
+        msgtype: markdown
+        content: |
+          #### 🎉 ${DRONE_REPO} 已提交，开始执行 CI/CD
+          > Author: ${DRONE_COMMIT_AUTHOR}
+          {{ if ne .Event "tag" -}}
+          > Branch: ${DRONE_COMMIT_BRANCH}
+          {{ end -}}
+          > Event: ${DRONE_BUILD_EVENT}
+          > Runner: ${DRONE_STAGE_MACHINE}
+          > Commit: [{{ .Message }}](${DRONE_COMMIT_LINK})
+          > [点击查看](${DRONE_BUILD_LINK})
+    
+    - name: check code
+      image: ghcr.io/astral-sh/uv:debian
+      volumes:
+        - name: uv_cache
+          path: /tmp/uv_cache
+        - name: venv_cache
+          path: /tmp/venv_cache
+      commands:
+        - export UV_CACHE_DIR=/tmp/uv_cache
+        - export UV_PROJECT_ENVIRONMENT=/tmp/venv_cache/.venv
+        - uv sync
+        - uv run ruff check
+        - uv run pytest
+
+    - name: notify
+      image: fifsky/drone-wechat-work
+      pull: always
+      settings:
+        url:
+          from_secret: wecom_bot_url
+        msgtype: markdown
+        content: |
+          {{ if eq .Status "success" }}
+          #### 🎉 ${DRONE_REPO} 构建成功
+          {{ else }}
+          #### ❌ ${DRONE_REPO} 构建失败
+          {{ end }}
+          > Author: ${DRONE_COMMIT_AUTHOR}
+          > Event: ${DRONE_BUILD_EVENT}
+          > Runner: ${DRONE_STAGE_MACHINE}
+          > Commit: [{{ .Message }}](${DRONE_COMMIT_LINK})
+          > [点击查看](${DRONE_BUILD_LINK})
+      when:
+        status: [ success, failure ]
+
+volumes:
+  - name: uv_cache
+    host:
+      path: /tmp/uv_cache  # uv package cache
+  - name: venv_cache
+    host:
+      path: /tmp/venv_cache  # virtual environment cache
