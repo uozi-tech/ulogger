@@ -2,6 +2,7 @@
 Core logging functionality using Factory and Builder patterns
 """
 
+from logging import Logger
 import sys
 from typing import Optional, Dict, Any
 from loguru import logger as _logger
@@ -66,7 +67,7 @@ class LoggerBuilder:
         self._config.extra.update(kwargs)
         return self
     
-    def build(self):
+    def build(self) -> Logger:
         """Build and return configured logger"""
         return LoggerFactory.create_logger(self._config)
 
@@ -75,7 +76,7 @@ class LoggerFactory:
     """Factory for creating different types of loggers"""
     
     @staticmethod
-    def create_logger(config: LoggerConfig):
+    def create_logger(config: LoggerConfig) -> Logger:
         """Create logger based on configuration"""
         # Remove existing handlers
         _logger.remove()

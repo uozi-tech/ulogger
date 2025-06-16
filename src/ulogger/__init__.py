@@ -11,6 +11,7 @@ from .core import LoggerFactory, LoggerBuilder
 from .session import SessionLogger
 from .capture import CaptureOutput
 from .sls import SLSConfig, SLSClient
+from logging import Logger
 
 __all__ = [
     "LoggerFactory",
@@ -19,4 +20,5 @@ __all__ = [
     "CaptureOutput",
     "SLSConfig",
     "SLSClient",
+    "Logger",
 ]
