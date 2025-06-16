@@ -17,7 +17,7 @@ Universal Python logging utilities with SLS and session support
 
 ```bash
 # 使用 uv 从 Git 安装
-uv add git+https://git.uozi.org/uozi/ulogger.git@v0.1.0
+uv add git+https://github.com/uozi-tech/ulogger.git@v0.1.2
 
 # 或者本地开发安装
 cd ulogger
@@ -111,7 +111,14 @@ builder.with_console(False)  # 禁用控制台输出
 builder.with_file("application.log")
 
 # SLS 输出
-sls_config = SLSConfig.from_env()
+sls_config = SLSConfig(
+    endpoint="https://your-region.log.aliyuncs.com",
+    access_key_id="your_access_key_id",
+    access_key_secret="your_access_key_secret",
+    project="your_project",
+    logstore="your_logstore",
+    service_name="your_service"
+)
 builder.with_sls(sls_config)
 
 # 添加额外上下文数据
@@ -155,7 +162,14 @@ session_logger = SessionLogger.create("service", "session_id")
 session_logger = SessionLogger.create_with_file("service", "session_id", "session.log")
 
 # 3. 带 SLS 支持的会话日志器
-sls_config = SLSConfig.from_env()
+sls_config = SLSConfig(
+    endpoint="https://your-region.log.aliyuncs.com",
+    access_key_id="your_access_key_id",
+    access_key_secret="your_access_key_secret",
+    project="your_project",
+    logstore="your_logstore",
+    service_name="your_service"
+)
 session_logger = SessionLogger.create_with_sls("service", "session_id", sls_config)
 
 # 4. 自定义配置的会话日志器
@@ -212,11 +226,7 @@ sls_config = SLSConfig(
     service_name="my_service"
 )
 
-# 2. 从环境变量创建配置
-sls_config = SLSConfig.from_env()  # 使用默认服务名
-sls_config = SLSConfig.from_env("custom_service_name")  # 自定义服务名
-
-# 3. 检查配置有效性
+# 2. 检查配置有效性
 if sls_config.is_valid():
     print("SLS configuration is valid")
 else:
@@ -228,7 +238,14 @@ else:
 ```python
 from ulogger import SLSConfig, SLSClient
 
-sls_config = SLSConfig.from_env()
+sls_config = SLSConfig(
+    endpoint="https://your-region.log.aliyuncs.com",
+    access_key_id="your_access_key_id",
+    access_key_secret="your_access_key_secret",
+    project="your_project",
+    logstore="your_logstore",
+    service_name="your_service"
+)
 client = SLSClient(sls_config)
 
 # 检查项目是否存在
@@ -270,7 +287,15 @@ with capture_output("capture") as capture:
 from ulogger import LoggerBuilder, SessionLogger, SLSConfig, CaptureOutput
 
 # 创建复杂配置的日志器
-sls_config = SLSConfig.from_env()
+sls_config = SLSConfig(
+    endpoint="https://your-region.log.aliyuncs.com",
+    access_key_id="your_access_key_id",
+    access_key_secret="your_access_key_secret",
+    project="your_project",
+    logstore="your_logstore",
+    service_name="your_service"
+)
+
 builder = (LoggerBuilder()
            .with_tag("complex_app")
            .with_level("DEBUG")
