@@ -11,22 +11,25 @@ from dataclasses import dataclass
 @dataclass
 class SLSConfig:
     """SLS configuration data class"""
+
     endpoint: str = ""
     access_key_id: str = ""
     access_key_secret: str = ""
     project: str = ""
     logstore: str = ""
     service_name: str = ""
-    
+
     def is_valid(self) -> bool:
         """Check if all required fields are present"""
-        return all([
-            self.endpoint,
-            self.access_key_id,
-            self.access_key_secret,
-            self.project,
-            self.logstore
-        ])
+        return all(
+            [
+                self.endpoint,
+                self.access_key_id,
+                self.access_key_secret,
+                self.project,
+                self.logstore,
+            ]
+        )
 
 
 class SLSClient:
@@ -35,13 +38,14 @@ class SLSClient:
     def __init__(self, config: SLSConfig):
         self.config = config
         self._client = None
-        
+
     @property
     def client(self):
         """Lazy initialization of SLS client"""
         if self._client is None:
             try:
                 from aliyun.log import LogClient
+
                 self._client = LogClient(
                     endpoint=self.config.endpoint,
                     accessKeyId=self.config.access_key_id,
@@ -56,9 +60,10 @@ class SLSClient:
         """检查项目是否存在"""
         if not self.client:
             return False
-            
+
         try:
             from aliyun.log.logexception import LogException
+
             self.client.get_project(self.config.project)
             return True
         except LogException as e:
@@ -76,9 +81,10 @@ class SLSClient:
         """创建项目"""
         if not self.client:
             return False
-            
+
         try:
             from aliyun.log.logexception import LogException
+
             self.client.create_project(self.config.project, description)
             print(f"Project {self.config.project} created successfully")
             return True
@@ -97,9 +103,10 @@ class SLSClient:
         """检查 logstore 是否存在"""
         if not self.client:
             return False
-            
+
         try:
             from aliyun.log.logexception import LogException
+
             self.client.get_logstore(self.config.project, self.config.logstore)
             return True
         except LogException as e:
@@ -125,9 +132,10 @@ class SLSClient:
         """
         if not self.client:
             return False
-            
+
         try:
             from aliyun.log.logexception import LogException
+
             self.client.create_logstore(
                 project_name=self.config.project,
                 logstore_name=self.config.logstore,
@@ -159,7 +167,7 @@ class SLSClient:
         确保 logstore 存在，如果不存在则创建
 
         Args:
-            ttl: 数据保存时间(天)，默认30天  
+            ttl: 数据保存时间(天)，默认30天
             shard_count: shard 数量，默认2个
             project_description: 项目描述
 
@@ -201,17 +209,17 @@ class SLSPropagateHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         if self.sls_logger and self.sls_logger.isEnabledFor(record.levelno):
             # Add service name to record
-            if hasattr(self, 'service_name'):
-                record.extra = getattr(record, 'extra', {})
+            if hasattr(self, "service_name"):
+                record.extra = getattr(record, "extra", {})
                 record.extra["service"] = self.service_name
             self.sls_logger.handle(record)
 
     @classmethod
-    def create(cls, config: SLSConfig) -> Optional['SLSPropagateHandler']:
+    def create(cls, config: SLSConfig) -> Optional["SLSPropagateHandler"]:
         """Create SLS handler if configuration is valid"""
         if not config.is_valid():
             return None
-            
+
         try:
             # Setup SLS logger
             sls_logger = cls._setup_sls_logging(config)
@@ -219,7 +227,7 @@ class SLSPropagateHandler(logging.Handler):
                 # Ensure logstore exists
                 client = SLSClient(config)
                 client.ensure_logstore_exists()
-                
+
                 handler = cls(sls_logger)
                 handler.service_name = config.service_name
                 return handler
@@ -232,7 +240,7 @@ class SLSPropagateHandler(logging.Handler):
     def _setup_sls_logging(config: SLSConfig):
         """设置阿里云 SLS 日志记录器"""
         try:
-            # Configure SLS handler  
+            # Configure SLS handler
             sls_conf = {
                 "version": 1,
                 "formatters": {

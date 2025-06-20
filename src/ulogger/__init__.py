@@ -1,7 +1,7 @@
 """
 Universal Logger Package
 
-A flexible logging library built on top of loguru with support for 
+A flexible logging library built on top of loguru with support for
 SLS (Alibaba Cloud Simple Log Service) and session-based logging.
 """
 
@@ -15,7 +15,7 @@ from logging import Logger
 
 __all__ = [
     "LoggerFactory",
-    "LoggerBuilder", 
+    "LoggerBuilder",
     "SessionLogger",
     "CaptureOutput",
     "SLSConfig",
