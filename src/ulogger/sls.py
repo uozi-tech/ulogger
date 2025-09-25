@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -297,10 +297,12 @@ class SLSPropagateHandler(logging.Handler):
             return repr(value)
 
     @staticmethod
-    def _to_content_pairs(contents: Dict[str, str]) -> Iterable[Tuple[str, str]]:
+    def _to_content_pairs(contents: Dict[str, str]) -> List[Tuple[str, str]]:
+        pairs: List[Tuple[str, str]] = []
         for key, value in contents.items():
             if value is not None:
-                yield (key, str(value))
+                pairs.append((key, str(value)))
+        return pairs
 
     @staticmethod
     def _resolve_timestamp(record: logging.LogRecord) -> Tuple[int, int]:
