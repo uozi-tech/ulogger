@@ -17,7 +17,7 @@ Universal Python logging utilities with SLS and session support
 
 ```bash
 # 使用 uv 从 Git 安装
-uv add git+https://github.com/uozi-tech/ulogger.git@v0.1.2
+uv add git+https://github.com/uozi-tech/ulogger.git@v0.1.3
 
 # 或者本地开发安装
 cd ulogger
@@ -48,14 +48,18 @@ from ulogger import LoggerFactory
 # 1. 创建基本日志器
 logger = LoggerFactory.create_basic_logger(tag="basic", level="INFO")
 
-# 2. 创建文件日志器（同时输出到控制台和文件）
-logger = LoggerFactory.create_file_logger(
-    tag="file_logger", 
-    file_path="app.log", 
-    level="DEBUG"
+# 2. 创建文件日志器（使用 Builder 配置文件输出）
+from ulogger import LoggerBuilder
+file_logger = (
+    LoggerBuilder()
+    .with_tag("file_logger")
+    .with_level("DEBUG")
+    .with_console()          # 需要控制台输出可保留
+    .with_file("app.log")    # 同时写入文件
+    .build()
 )
 
-# 3. 创建 SLS 日志器
+# 3. 创建带 SLS 输出的日志器（使用 Builder 配置 SLS）
 from ulogger import SLSConfig
 sls_config = SLSConfig(
     endpoint="https://your-region.log.aliyuncs.com",
@@ -65,7 +69,14 @@ sls_config = SLSConfig(
     logstore="your_logstore",
     service_name="your_service"
 )
-logger = LoggerFactory.create_sls_logger("sls_app", sls_config, "INFO")
+sls_logger = (
+    LoggerBuilder()
+    .with_tag("sls_app")
+    .with_level("INFO")
+    .with_console(False)
+    .with_sls(sls_config)
+    .build()
+)
 ```
 
 ### LoggerBuilder - 建造者模式
@@ -153,15 +164,23 @@ session_logger.warning("rate_limit", "Approaching rate limit", current=95, limit
 ### SessionLogger 工厂方法
 
 ```python
-from ulogger import SessionLogger, SLSConfig
+from ulogger import SessionLogger, LoggerBuilder, SLSConfig
 
 # 1. 基本会话日志器
 session_logger = SessionLogger.create("service", "session_id")
 
-# 2. 带文件输出的会话日志器
-session_logger = SessionLogger.create_with_file("service", "session_id", "session.log")
+# 2. 使用自定义日志器的会话日志器（文件输出示例）
+file_logger = (
+    LoggerBuilder()
+    .with_tag("service")
+    .with_level("INFO")
+    .with_console(False)
+    .with_file("session.log")
+    .build()
+)
+session_logger = SessionLogger("service", "session_id", file_logger)
 
-# 3. 带 SLS 支持的会话日志器
+# 3. 使用 SLS 的会话日志器
 sls_config = SLSConfig(
     endpoint="https://your-region.log.aliyuncs.com",
     access_key_id="your_access_key_id",
@@ -170,17 +189,15 @@ sls_config = SLSConfig(
     logstore="your_logstore",
     service_name="your_service"
 )
-session_logger = SessionLogger.create_with_sls("service", "session_id", sls_config)
-
-# 4. 自定义配置的会话日志器
-from ulogger import LoggerBuilder
-builder = (LoggerBuilder()
-           .with_tag("custom_session")
-           .with_level("INFO")
-           .with_file("session.log")
-           .with_extra(module="auth", version="2.0.0"))
-
-session_logger = SessionLogger.create_custom("auth", "sess_789", builder)
+sls_logger = (
+    LoggerBuilder()
+    .with_tag("service")
+    .with_level("INFO")
+    .with_console(False)
+    .with_sls(sls_config)
+    .build()
+)
+session_logger = SessionLogger("service", "session_id", sls_logger)
 ```
 
 ### SessionLogger 完整方法列表
@@ -273,9 +290,18 @@ success = client.ensure_logstore_exists(
 ## 输出捕获 (Capture)
 
 ```python
-from ulogger import capture_output
+from ulogger.capture import capture_output  # 函数从子模块导入
 
 with capture_output("capture") as capture:
+    print("Normal output")
+```
+
+或使用类形式（顶层导出）：
+
+```python
+from ulogger import CaptureOutput
+
+with CaptureOutput("capture") as cap:
     print("Normal output")
 ```
 
@@ -309,7 +335,7 @@ builder = (LoggerBuilder()
            ))
 
 # 使用自定义日志器创建会话日志器
-session_logger = SessionLogger.create_custom("user_service", "session_456", builder)
+session_logger = SessionLogger("user_service", "session_456", builder.build())
 
 # 结合输出捕获
 with CaptureOutput("operation_capture", session_logger.logger) as capture:
@@ -383,18 +409,19 @@ uv run ruff check
 ulogger/
 ├── src/
 │   └── ulogger/
-│       ├── __init__.py       # 包初始化和导出
-│       ├── core.py           # 核心日志功能 (LoggerFactory, LoggerBuilder)
-│       ├── sls.py            # SLS 集成 (SLSConfig, SLSClient, SLSPropagateHandler)
-│       ├── session.py        # 会话日志 (SessionLogger)
-│       └── capture.py        # 输出捕获 (CaptureOutput)
+│       ├── __init__.py       # 顶层导出
+│       ├── core.py           # LoggerFactory, LoggerBuilder
+│       ├── sls.py            # SLSConfig, SLSClient, SLSPropagateHandler
+│       ├── session.py        # SessionLogger
+│       └── capture.py        # CaptureOutput, capture_output（子模块）
 ├── tests/
-│   └── test_core.py         # 核心功能测试
-├── examples/
-│   └── basic_usage.py       # 使用示例
-├── pyproject.toml           # 项目配置
-├── README.md               # 说明文档
-└── main.py                 # 演示脚本
+│   ├── test_core.py
+│   ├── test_session.py
+│   ├── test_capture.py
+│   └── test_sls.py
+├── pyproject.toml            # 项目配置
+├── README.md                 # 说明文档
+└── uv.lock
 ```
 
 ## API 参考
@@ -414,8 +441,12 @@ from ulogger import (
     SLSConfig,        # SLS 配置
     SLSClient,        # SLS 客户端
     
-    # 全部输出捕获
-    capture_output,
+    # 输出捕获（类在顶层导出，函数在子模块）
+    CaptureOutput,    # 顶层导出
+    # capture_output 函数请从 ulogger.capture 导入
+    
+    # 其他
+    Logger,           # 来自 logging 的 Logger 类型
 )
 ```
 

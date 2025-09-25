@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name            = "ulogger"
-version         = "0.1.3"
+version         = "0.1.4"
 description     = "Universal Python logging utilities with SLS and session support"
 requires-python = ">=3.9"
 authors         = [{name="0xJacky", email="me@jackyu.cn"}]
 dependencies    = [
     "loguru>=0.7.0",
-    "aliyun-log-python-sdk>=0.6.20",
+    "aliyun-log-python-sdk>=0.9.32",
     "pytest>=8.4.0",
     "pytest-cov>=4.1.0",
     "ruff>=0.11.13",

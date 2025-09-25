@@ -2,11 +2,12 @@
 Tests for SLS (Simple Log Service) functionality
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 import logging
+from unittest.mock import MagicMock, patch
 
-from ulogger.sls import SLSConfig, SLSClient, SLSPropagateHandler
+import pytest
+
+from ulogger.sls import SLSClient, SLSConfig, SLSPropagateHandler
 
 
 class TestSLSConfig:
@@ -347,21 +348,31 @@ class TestSLSPropagateHandler:
 
     def test_init(self):
         """Test SLSPropagateHandler initialization"""
-        mock_sls_logger = MagicMock()
-        handler = SLSPropagateHandler(mock_sls_logger)
+        client = MagicMock()
+        handler = SLSPropagateHandler(
+            client,
+            self.config,
+            log_item_cls=MagicMock,
+            put_logs_request_cls=MagicMock,
+            log_exception_cls=Exception,
+        )
 
-        assert handler.sls_logger == mock_sls_logger
         assert isinstance(handler, logging.Handler)
 
     def test_emit(self):
         """Test emit method"""
-        mock_sls_logger = MagicMock()
-        mock_sls_logger.isEnabledFor.return_value = True
+        client = MagicMock()
+        log_item = MagicMock()
+        put_logs_request = MagicMock()
 
-        handler = SLSPropagateHandler(mock_sls_logger)
-        handler.service_name = "test_service"
+        handler = SLSPropagateHandler(
+            client,
+            self.config,
+            log_item_cls=lambda: log_item,
+            put_logs_request_cls=MagicMock(return_value=put_logs_request),
+            log_exception_cls=Exception,
+        )
 
-        # Create a log record
         record = logging.LogRecord(
             name="test",
             level=logging.INFO,
@@ -371,22 +382,24 @@ class TestSLSPropagateHandler:
             args=(),
             exc_info=None,
         )
+        record.extra = {"custom": "value"}
 
         handler.emit(record)
 
-        # Verify the logger was called
-        mock_sls_logger.handle.assert_called_once_with(record)
-
-        # Verify extra service info was added
-        assert hasattr(record, "extra")
-        assert record.extra["service"] == "test_service"
+        assert log_item.set_time.call_count == 1
+        assert log_item.set_time_nano_part.call_count == 1
+        log_item.set_contents.assert_called_once()
+        client.put_logs.assert_called_once_with(put_logs_request)
 
     def test_emit_logger_disabled(self):
         """Test emit method when logger is disabled for the level"""
-        mock_sls_logger = MagicMock()
-        mock_sls_logger.isEnabledFor.return_value = False
-
-        handler = SLSPropagateHandler(mock_sls_logger)
+        handler = SLSPropagateHandler(
+            None,
+            self.config,
+            log_item_cls=MagicMock,
+            put_logs_request_cls=MagicMock,
+            log_exception_cls=Exception,
+        )
 
         record = logging.LogRecord(
             name="test",
@@ -400,12 +413,15 @@ class TestSLSPropagateHandler:
 
         handler.emit(record)
 
-        # Logger should not be called
-        mock_sls_logger.handle.assert_not_called()
-
     def test_emit_no_logger(self):
         """Test emit method when sls_logger is None"""
-        handler = SLSPropagateHandler(None)
+        handler = SLSPropagateHandler(
+            None,
+            self.config,
+            log_item_cls=MagicMock,
+            put_logs_request_cls=MagicMock,
+            log_exception_cls=Exception,
+        )
 
         record = logging.LogRecord(
             name="test",
@@ -420,24 +436,18 @@ class TestSLSPropagateHandler:
         # Should not raise an exception
         handler.emit(record)
 
-    @patch("ulogger.sls.SLSPropagateHandler._setup_sls_logging")
     @patch("ulogger.sls.SLSClient")
-    def test_create_success(self, mock_sls_client_class, mock_setup_sls):
+    def test_create_success(self, mock_sls_client_class):
         """Test successful handler creation"""
-        mock_sls_logger = MagicMock()
-        mock_setup_sls.return_value = mock_sls_logger
-
         mock_client_instance = MagicMock()
         mock_client_instance.ensure_logstore_exists.return_value = True
+        mock_client_instance.client = MagicMock()
         mock_sls_client_class.return_value = mock_client_instance
 
         handler = SLSPropagateHandler.create(self.config)
 
         assert isinstance(handler, SLSPropagateHandler)
-        assert handler.sls_logger == mock_sls_logger
-        assert handler.service_name == self.config.service_name
-
-        mock_setup_sls.assert_called_once_with(self.config)
+        assert handler._client == mock_client_instance.client
         mock_client_instance.ensure_logstore_exists.assert_called_once()
 
     def test_create_invalid_config(self):
@@ -448,57 +458,17 @@ class TestSLSPropagateHandler:
 
         assert handler is None
 
-    @patch("ulogger.sls.SLSPropagateHandler._setup_sls_logging")
-    def test_create_setup_failure(self, mock_setup_sls):
+    def test_create_setup_failure(self):
         """Test handler creation when SLS setup fails"""
-        mock_setup_sls.return_value = None
 
-        handler = SLSPropagateHandler.create(self.config)
+        with patch("ulogger.sls.SLSClient") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.ensure_logstore_exists.return_value = False
+            mock_client_class.return_value = mock_client
+
+            handler = SLSPropagateHandler.create(self.config)
 
         assert handler is None
-
-    @patch("logging.config.dictConfig")
-    @patch("logging.getLogger")
-    def test_setup_sls_logging_success(self, mock_get_logger, mock_dict_config):
-        """Test successful SLS logging setup"""
-        mock_logger = MagicMock()
-        mock_get_logger.return_value = mock_logger
-
-        result = SLSPropagateHandler._setup_sls_logging(self.config)
-
-        assert result == mock_logger
-        mock_dict_config.assert_called_once()
-        mock_get_logger.assert_called_once_with("sls")
-
-        # Verify the configuration structure
-        call_args = mock_dict_config.call_args[0][0]
-        assert call_args["version"] == 1
-        assert "formatters" in call_args
-        assert "handlers" in call_args
-        assert "loggers" in call_args
-
-        # Verify SLS handler configuration
-        sls_handler = call_args["handlers"]["sls"]
-        assert sls_handler["end_point"] == self.config.endpoint
-        assert sls_handler["access_key_id"] == self.config.access_key_id
-        assert sls_handler["access_key"] == self.config.access_key_secret
-        assert sls_handler["project"] == self.config.project
-        assert sls_handler["log_store"] == self.config.logstore
-
-    def test_setup_sls_logging_import_error(self):
-        """Test SLS logging setup when aliyun SDK is not available"""
-        with patch("logging.config.dictConfig", side_effect=ImportError("No module")):
-            result = SLSPropagateHandler._setup_sls_logging(self.config)
-            assert result is None
-
-    @patch("logging.config.dictConfig")
-    def test_setup_sls_logging_config_error(self, mock_dict_config):
-        """Test SLS logging setup when configuration fails"""
-        mock_dict_config.side_effect = Exception("Configuration error")
-
-        result = SLSPropagateHandler._setup_sls_logging(self.config)
-
-        assert result is None
 
 
 class TestSLSIntegration:
@@ -518,26 +488,21 @@ class TestSLSIntegration:
         # Mock all external dependencies
         with (
             patch("ulogger.sls.SLSClient") as mock_client_class,
-            patch("ulogger.sls.SLSPropagateHandler._setup_sls_logging") as mock_setup,
+            patch("aliyun.log.LogItem", autospec=True),
+            patch("aliyun.log.PutLogsRequest", autospec=True),
+            patch("aliyun.log.logexception.LogException", new=Exception),
         ):
-            # Setup mocks
-            mock_logger = MagicMock()
-            mock_setup.return_value = mock_logger
-
             mock_client = MagicMock()
             mock_client.ensure_logstore_exists.return_value = True
+            mock_client.client = MagicMock()
             mock_client_class.return_value = mock_client
 
-            # Create handler
             handler = SLSPropagateHandler.create(config)
 
-            # Verify handler was created successfully
             assert handler is not None
             assert isinstance(handler, SLSPropagateHandler)
-            assert handler.service_name == "integration_test"
+            assert handler._client == mock_client.client
 
-            # Verify the workflow was executed
-            mock_setup.assert_called_once_with(config)
             mock_client.ensure_logstore_exists.assert_called_once()
 
 

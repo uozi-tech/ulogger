@@ -1,10 +1,10 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.9"
 
 [[package]]
 name = "aliyun-log-python-sdk"
-version = "0.9.23"
+version = "0.9.32"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "dateparser" },
@@ -16,7 +16,7 @@ dependencies = [
     { name = "requests" },
     { name = "six" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/76/d6f813e0a66b779455a920a0f459474e97723a8dc54075d5d6e57552c663/aliyun_log_python_sdk-0.9.23.tar.gz", hash = "sha256:662e6ce1b860139ea9cd8c302a6f291ec94e797d54b6212800f00db2427372bf", size = 140524, upload-time = "2025-06-12T03:20:29.576Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/dc/cd9d02403f0ecd498ba68310f5a6646f28cae1b375f691d272381578028d/aliyun_log_python_sdk-0.9.32.tar.gz", hash = "sha256:490eb1b293c56936c0783f1dfcb499b7bf66276fde7ea3e69065437aee521a8c", size = 150376, upload-time = "2025-09-22T06:00:03.296Z" }
 
 [[package]]
 name = "certifi"
@@ -632,7 +632,7 @@ wheels = [
 
 [[package]]
 name = "ulogger"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "aliyun-log-python-sdk" },
@@ -644,7 +644,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aliyun-log-python-sdk", specifier = ">=0.6.20" },
+    { name = "aliyun-log-python-sdk", specifier = ">=0.9.32" },
     { name = "loguru", specifier = ">=0.7.0" },
     { name = "pytest", specifier = ">=8.4.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
