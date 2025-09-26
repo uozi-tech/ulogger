@@ -257,31 +257,56 @@ class SLSPropagateHandler(logging.Handler):
     def _build_contents(self, record: logging.LogRecord) -> Dict[str, str]:
         contents: Dict[str, str] = {
             "message": record.getMessage(),
-            "level": record.levelname,
-            "logger": record.name,
+            "levelname": record.levelname,
+            "name": record.name,
         }
+
+        if record.module:
+            contents["module"] = record.module
+        if record.funcName:
+            contents["funcName"] = record.funcName
+        if record.pathname:
+            contents["pathname"] = record.pathname
+        if record.process:
+            contents["process"] = str(record.process)
+        if getattr(record, "processName", None):
+            contents["processName"] = record.processName
+        if record.thread:
+            contents["thread"] = str(record.thread)
+        if getattr(record, "threadName", None):
+            contents["threadName"] = record.threadName
+        if record.lineno:
+            contents["lineno"] = str(record.lineno)
 
         if self._config.service_name:
             contents["service"] = self._config.service_name
 
         extras = getattr(record, "extra", None)
+        extra_payload: Dict[str, str] = {}
         if isinstance(extras, dict):
             for key, value in extras.items():
+                serialized = self._serialize_value(value)
+                extra_payload[key] = serialized
                 if key not in contents:
-                    contents[key] = self._serialize_value(value)
+                    contents[key] = serialized
 
         if "tag" not in contents:
             tag = getattr(record, "tag", None)
             if tag is not None:
-                contents["tag"] = self._serialize_value(tag)
-
-        if record.pathname:
-            contents.setdefault("path", record.pathname)
-        if record.lineno:
-            contents.setdefault("line", str(record.lineno))
+                serialized_tag = self._serialize_value(tag)
+                contents["tag"] = serialized_tag
+                extra_payload.setdefault("tag", serialized_tag)
 
         if record.exc_info:
             contents.setdefault("exc", self.formatException(record.exc_info))
+
+        if self._config.service_name:
+            extra_payload.setdefault("service", self._config.service_name)
+
+        if extra_payload:
+            contents["extra"] = json.dumps(extra_payload, ensure_ascii=False)
+
+        contents.setdefault("path", record.pathname or "")
 
         return contents
 

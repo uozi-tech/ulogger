@@ -382,7 +382,7 @@ class TestSLSPropagateHandler:
             args=(),
             exc_info=None,
         )
-        record.extra = {"custom": "value"}
+        record.extra = {"custom": "value", "tag": "billing", "service": "demo"}
 
         handler.emit(record)
 
