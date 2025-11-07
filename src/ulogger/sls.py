@@ -1,11 +1,42 @@
 """SLS (Simple Log Service) integration for Alibaba Cloud."""
 
+import hashlib
 import json
 import logging
+import os
+import secrets
+import socket
 import threading
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
+
+
+class PackIdGenerator:
+    """生成符合阿里云 PackId 规范的标识符，线程安全"""
+
+    _PREFIX_LENGTH = 16
+
+    def __init__(self, prefix: Optional[str] = None) -> None:
+        self._lock = threading.Lock()
+        self._counter = 0
+        self._prefix = (prefix or self._build_prefix()).upper()
+
+    def generate(self) -> str:
+        """生成新的 PackId，格式为 <前缀>-<递增十六进制序号>"""
+        with self._lock:
+            self._counter += 1
+            sequence = self._counter
+        return f"{self._prefix}-{sequence:X}"
+
+    def _build_prefix(self) -> str:
+        hostname = socket.gethostname()
+        pid = os.getpid()
+        now_ns = time.time_ns()
+        entropy = secrets.token_hex(8)
+        payload = f"{hostname}|{pid}|{now_ns}|{entropy}".encode("utf-8")
+        digest = hashlib.sha256(payload).hexdigest().upper()
+        return digest[: self._PREFIX_LENGTH]
 
 
 @dataclass
@@ -217,6 +248,7 @@ class SLSPropagateHandler(logging.Handler):
         self._PutLogsRequest = put_logs_request_cls
         self._LogException = log_exception_cls
         self._lock = threading.Lock()
+        self._pack_id_generator = PackIdGenerator()
 
     def emit(self, record: logging.LogRecord) -> None:
         if not self._client:
@@ -238,6 +270,9 @@ class SLSPropagateHandler(logging.Handler):
                 self._config.logstore,
                 logitems=[log_item],
             )
+
+            pack_id = self._pack_id_generator.generate()
+            self._attach_pack_id(request, pack_id)
 
             with self._lock:
                 self._client.put_logs(request)
@@ -340,6 +375,25 @@ class SLSPropagateHandler(logging.Handler):
 
         now_ns = time.time_ns()
         return now_ns // 1_000_000_000, now_ns % 1_000_000_000
+
+    def _attach_pack_id(self, request, pack_id: str) -> None:
+        tag_payload = [("__pack_id__", pack_id)]
+
+        set_logtags = getattr(request, "set_logtags", None)
+        if callable(set_logtags):
+            set_logtags(tag_payload)
+            return
+
+        set_log_tags = getattr(request, "set_log_tags", None)
+        if callable(set_log_tags):
+            set_log_tags(tag_payload)
+            return
+
+        if hasattr(request, "logtags"):
+            request.logtags = tag_payload
+            return
+
+        request.log_tags = tag_payload
 
     @classmethod
     def create(cls, config: SLSConfig) -> Optional["SLSPropagateHandler"]:

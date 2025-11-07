@@ -7,7 +7,27 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ulogger.sls import SLSClient, SLSConfig, SLSPropagateHandler
+from ulogger.sls import PackIdGenerator, SLSClient, SLSConfig, SLSPropagateHandler
+
+
+class TestPackIdGenerator:
+    """Test PackIdGenerator behavior"""
+
+    def test_generate_sequence_and_format(self):
+        generator = PackIdGenerator()
+
+        first = generator.generate()
+        second = generator.generate()
+
+        assert first != second
+
+        prefix1, seq1 = first.split("-")
+        prefix2, seq2 = second.split("-")
+
+        assert len(prefix1) == 16
+        assert prefix1 == prefix1.upper()
+        assert prefix1 == prefix2
+        assert int(seq2, 16) == int(seq1, 16) + 1
 
 
 class TestSLSConfig:
@@ -364,6 +384,7 @@ class TestSLSPropagateHandler:
         client = MagicMock()
         log_item = MagicMock()
         put_logs_request = MagicMock()
+        put_logs_request.set_logtags = MagicMock()
 
         handler = SLSPropagateHandler(
             client,
@@ -389,6 +410,13 @@ class TestSLSPropagateHandler:
         assert log_item.set_time.call_count == 1
         assert log_item.set_time_nano_part.call_count == 1
         log_item.set_contents.assert_called_once()
+        put_logs_request.set_logtags.assert_called_once()
+        tags = put_logs_request.set_logtags.call_args[0][0]
+        assert tags[0][0] == "__pack_id__"
+        pack_id_value = tags[0][1]
+        prefix, seq = pack_id_value.split("-")
+        assert len(prefix) == 16
+        assert int(seq, 16) >= 1
         client.put_logs.assert_called_once_with(put_logs_request)
 
     def test_emit_logger_disabled(self):
