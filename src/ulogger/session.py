@@ -15,7 +15,7 @@ class SessionLogger:
     def __init__(self, tag: str, session_id: str, logger: Optional[Logger] = None):
         """
         Initialize session logger
-        
+
         Args:
             tag: Logger tag identifier
             session_id: Unique session identifier
@@ -23,7 +23,7 @@ class SessionLogger:
         """
         self.session_id = session_id
         self.tag = tag
-        
+
         if logger is None:
             # Create default logger if none provided
             self.logger = LoggerFactory.create_basic_logger(tag)
@@ -31,25 +31,25 @@ class SessionLogger:
             self.logger = logger
 
     @classmethod
-    def create(cls, tag: str, session_id: str) -> 'SessionLogger':
+    def create(cls, tag: str, session_id: str) -> "SessionLogger":
         """Factory method to create a basic session logger"""
         return cls(tag, session_id)
 
     def _format_message(self, event: str, content: str = "", **kwargs) -> str:
         """Format structured log message"""
-        parts = [f'session={self.session_id}', f'event="{event}"']
-        
+        parts = [f"session={self.session_id}", f'event="{event}"']
+
         if content:
             parts.append(f'content="{content}"')
-            
+
         # Add any additional key-value pairs
         for key, value in kwargs.items():
             if isinstance(value, str):
                 parts.append(f'{key}="{value}"')
             else:
-                parts.append(f'{key}={value}')
-                
-        return ' '.join(parts)
+                parts.append(f"{key}={value}")
+
+        return " ".join(parts)
 
     def info(self, event: str, content: str = "", **kwargs):
         """Log info level message with session context"""
@@ -91,7 +91,7 @@ class SessionLogger:
         self.logger = self.logger.bind(**kwargs)
         return self
 
-    def with_context(self, **kwargs) -> 'SessionLogger':
+    def with_context(self, **kwargs) -> "SessionLogger":
         """Create a new session logger with additional context"""
         new_logger = self.logger.bind(**kwargs)
         return SessionLogger(self.tag, self.session_id, new_logger)
